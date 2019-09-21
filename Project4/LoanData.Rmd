@@ -1,0 +1,303 @@
+Prosper Loan Data Analysis by Preston Hall
+========================================================
+  
+
+> We will be using the data provided by Prosper Bank loans. Prosper Bank has
+facilitated more than $12 billion in loans to more than 770,000 people. You can
+find more information about Prosper Bank at their [website.](www.prosper.com)
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Load all of the packages that you end up using in your analysis in this code
+# chunk.
+
+# Notice that the parameter "echo" was set to FALSE for this code chunk. This
+# prevents the code from displaying in the knitted HTML output. You should set
+# echo=FALSE for all code chunks in your file, unless it makes sense for your
+# report to show the code that generated a particular plot.
+
+# The other parameters for "message" and "warning" should also be set to FALSE
+# for other code chunks once you have verified that each plot comes out as you
+# want it to. This will clean up the flow of your report.
+library(ggplot2)
+library(ggthemes)
+library(gridExtra)
+library(stringr)
+library(plyr)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Load_the_Data}
+# Load the Data
+loanData <- read.csv('prosperLoanData.csv')
+```
+
+> Introduction: (Needs work) I have worked in the financial industry for close to
+10 years and have serviced and reviewed many loan documents. I am excited to 
+analyze this data and discover new information.
+
+> The data that we are exploring is provided in a .csv file 86.5 MB. There are a
+total of 81 variables and 113,937 observations. There is information than what is 
+needed for this project so I will subest it out to 16 different varaiables and 
+remove all of the NA values. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, SubsetTheDate}
+loanSubset <- subset(loanData, select = c(
+  Term, 
+  LoanStatus,
+  BorrowerRate,
+  BorrowerState,
+  Occupation,
+  EmploymentStatus,
+  CreditScoreRangeLower,
+  CreditScoreRangeUpper,
+  CreditGrade,
+  OpenCreditLines,
+  CurrentDelinquencies,
+  AmountDelinquent,
+  DebtToIncomeRatio,
+  StatedMonthlyIncome,
+  IncomeRange,
+  MonthlyLoanPayment
+))
+```
+
+> Now that I have the subset that I want to work with, I will clean it up a bit by removing a few of the NA values and adding factors to IncomeRange, Term and CreditGrade. IncomeRange and CreditGrade will ibe ordered factors.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, CleanAndRemoveNA}
+loanSubset$IncomeRange <- factor(loanSubset$IncomeRange, 
+                                 levels=c("$1-24,999", "$25,000-49,999", 
+                                          "$50,000-74,999", "$75,000-99,999", 
+                                          "$100,000+","Not employed"), 
+                                 ordered=TRUE, 
+                                 exclude = "Not displayed")
+
+loanSubset$Term <- as.factor(loanSubset$Term)
+
+loans <- na.exclude(loanSubset)
+
+loans$CreditGrade <- factor(loans$CreditGrade, 
+                            levels = c("AA", "A", "B", "C", "D", "E", "HR", "NC"), 
+                            ordered = TRUE)
+```
+
+# Univariate Plots Section
+
+> **Tip**: In this section, you should perform some preliminary exploration of
+your dataset. Run some summaries of the data and create univariate plots to
+understand the structure of the individual variables in your dataset. Don't
+forget to add a comment after each plot or closely-related group of plots!
+  There should be multiple code chunks and text sections; the first one below is
+just to help you get started.
+
+
+### Variables I will be working with
+```{r Variable Names, echo=FALSE, message=TRUE, warning=TRUE}
+names(loans)
+```
+
+- Term
+- LoanStatus
+- BorrowerRate
+- BorrowerState
+- Occupation
+- EmploymentStatus
+- CreditScoreRangeLower
+- CreditScoreRangeUpper
+- CreditGrade
+- OpenCreditLines
+- CurrentDelinquencies
+- AmountDelinquent
+- DebtToIncomeRatio
+- StatedMonthlyIncome
+- IncomeRange
+- MonthlyLoanPayment
+
+### Borrower APR
+```{r echo=FALSE, message=FALSE, warning=FALSE, BorrowerAPR}
+qplot(x = BorrowerRate, data = loans, binwidth = 0.005) +
+  scale_x_continuous(limits = c(0,0.36), breaks = seq(0,0.36,0.02)) +
+  scale_y_continuous(breaks = seq(0,6000,500))
+summary(loans$BorrowerRate)
+```
+
+> This graph is interesting as it is has a fairly normal distribution save for the rate at 32% the amount jumps up to over 4500.
+
+
+### Stated Monthly Income
+```{r echo=FALSE, message=FALSE, warning=FALSE, StatedMonthlyIncome}
+summary(loans$StatedMonthlyIncome)
+income1 <- ggplot(aes(x = StatedMonthlyIncome), data = loans) +
+  geom_histogram(binwidth = 500) +
+  xlim(0, 20000) +
+  xlab('Stated Monthly Income in USD') +
+  ylab('Number of Applicants')
+
+income2 <- ggplot(loans, aes(x = StatedMonthlyIncome)) +
+  geom_density() +
+  xlim(0, 20000)
+
+grid.arrange(income1, income2, ncol = 1)
+```
+> You can see on this graph that the plot peaks at about $3,000 per month and then decreases. I had to limit the x axis as there is an outlier that skews the graph to a point that is unreadable. 
+
+
+### Term
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Term}
+summary(loans$Term)
+
+qplot(Term, data = loans)
+```
+
+> The types of loans fall into 3 different terms 12, 36, or 60 months. Or 1, 3, or 5 years respectively. The most common term is 3 years with over 73,000 loans.
+
+### Credit Score effect on Rate
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, CreditVRate}
+CreditRate1 <- ggplot(aes(x = CreditScoreRangeUpper, y = BorrowerRate), data = loans) +
+  geom_point()
+
+CreditRate2 <- ggplot(aes(x = CreditScoreRangeUpper, y = BorrowerRate), data = loans) +
+  geom_jitter(alpha = 1/50, position = position_jitter(h = 0)) 
+
+CreditRate3 <- ggplot(aes(x = CreditScoreRangeUpper, y = BorrowerRate), data = loans) +
+  geom_jitter(alpha = 1/50, position = position_jitter(h = 0)) +
+  geom_smooth()
+
+grid.arrange(CreditRate1, CreditRate2, CreditRate3)
+```
+
+> This scatter plot was very difficult to see any relation between Credit Score and Borrower Rate. I transformed the data so the plotted points were more transparent and added a linear regression line. You can see that the the interest rate decreases as the credit score improves. 
+
+### CreditGrade
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, CreditGrade}
+qplot(data = loans, x = CreditGrade) +
+  xlim("AA", "A", "B", "C", "D", "E", "HR")
+summary(loans$CreditGrade)
+```
+
+> Customer are given a credit grade when provided a loan by Prosper Bank. AA would be the highest score with HR (High Risk) being at the lower end. Most customs have a score between B and D. I am not including NA values in this graph.
+
+
+# Univariate Analysis
+
+> **Tip**: Now that you've completed your univariate explorations, it's time to
+reflect on and summarize what you've found. Use the questions below to help you
+gather your observations and add your own if you have other thoughts!
+
+### What is the structure of your dataset?
+```{r}
+dim(loanData)
+# structure(loanData)
+```
+
+### What is/are the main feature(s) of interest in your dataset?
+
+### What other features in the dataset do you think will help support your \
+investigation into your feature(s) of interest?
+
+### Did you create any new variables from existing variables in the dataset?
+
+### Of the features you investigated, were there any unusual distributions? \
+Did you perform any operations on the data to tidy, adjust, or change the form \
+of the data? If so, why did you do this?
+
+
+# Bivariate Plots Section
+
+> **Tip**: Based on what you saw in the univariate plots, what relationships
+between variables might be interesting to look at in this section? Don't limit
+yourself to relationships between a main output feature and one of the
+supporting variables. Try to look at relationships between supporting variables
+as well.
+
+```{r echo=FALSE, Bivariate_Plots}
+
+```
+
+# Bivariate Analysis
+
+> **Tip**: As before, summarize what you found in your bivariate explorations
+here. Use the questions below to guide your discussion.
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. How did the feature(s) of interest vary with other features in \
+the dataset?
+  
+  ### Did you observe any interesting relationships between the other features \
+  (not the main feature(s) of interest)?
+  
+  ### What was the strongest relationship you found?
+  
+  
+  # Multivariate Plots Section
+  
+  > **Tip**: Now it's time to put everything together. Based on what you found in
+the bivariate plots section, create a few multivariate plots to investigate
+more complex interactions between variables. Make sure that the plots that you
+create here are justified by the plots you explored in the previous section. If
+you plan on creating any mathematical models, this is the section where you
+will do that.
+
+```{r echo=FALSE, Multivariate_Plots}
+
+```
+
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. Were there features that strengthened each other in terms of \
+looking at your feature(s) of interest?
+
+### Were there any interesting or surprising interactions between features?
+
+### OPTIONAL: Did you create any models with your dataset? Discuss the \
+strengths and limitations of your model.
+
+------
+
+# Final Plots and Summary
+
+> **Tip**: You've done a lot of exploration and have built up an understanding
+of the structure of and relationships between the variables in your dataset.
+Here, you will select three plots from all of your previous exploration to
+present here as a summary of some of your most interesting findings. Make sure
+that you have refined your selected plots for good titling, axis labels (with
+                                                                         units), and good aesthetic choices (e.g. color, transparency). After each plot,
+make sure you justify why you chose each plot by describing what it shows.
+
+### Plot One
+```{r echo=FALSE, Plot_One}
+
+```
+
+### Description One
+
+
+### Plot Two
+```{r echo=FALSE, Plot_Two}
+
+```
+
+### Description Two
+
+
+### Plot Three
+```{r echo=FALSE, Plot_Three}
+
+```
+
+### Description Three
+
+------
+  
+  # Reflection
+  
+  > **Tip**: Here's the final step! Reflect on the exploration you performed and
+the insights you found. What were some of the struggles that you went through?
+What went well? What was surprising? Make sure you include an insight into
+future work that could be done with the dataset.
+
+> **Tip**: Don't forget to remove this, and the other **Tip** sections before
+saving your final work and knitting the final report!
