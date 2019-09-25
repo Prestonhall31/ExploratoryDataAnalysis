@@ -2,10 +2,13 @@ Prosper Loan Data Analysis by Preston Hall
 ========================================================
   
 
-> We will be using the data provided by Prosper Bank loans. Prosper Bank has
-facilitated more than $12 billion in loans to more than 770,000 people. You can
-find more information about Prosper Bank at their [website.](www.prosper.com)
-
+> We will be using the data provided by Prosper Bank loans. Prosper Bank has facilitated more than $12 billion in loans to more than 770,000 people. You can find more information about Prosper Bank at their [website.](www.prosper.com)  
+<br>
+I have worked in the financial industry for close to 10 years and have serviced and reviewed many loan documents. I am excited to analyze this data and discover new information.
+<br>
+The data that we are exploring is provided in a .csv file 86.5 MB. There are a total of 81 variables and 113,937 observations. There is information than what isneeded for this project so I will subest it out to 16 different varaiables and remove all of the NA values.
+<br>
+> After I have created the subset that I want to work with, I will clean it up a bit by removing a few of the NA values and adding factors to IncomeRange, Term and CreditGrade. IncomeRange and CreditGrade will be ordered factors.
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
 # Load all of the packages that you end up using in your analysis in this code
@@ -31,16 +34,7 @@ library(plyr)
 loanData <- read.csv('prosperLoanData.csv')
 ```
 
-> Introduction: (Needs work) I have worked in the financial industry for close to
-10 years and have serviced and reviewed many loan documents. I am excited to 
-analyze this data and discover new information.
-
-> The data that we are exploring is provided in a .csv file 86.5 MB. There are a
-total of 81 variables and 113,937 observations. There is information than what is 
-needed for this project so I will subest it out to 16 different varaiables and 
-remove all of the NA values. 
-
-```{r echo=FALSE, message=FALSE, warning=FALSE, SubsetTheDate}
+```{r echo=FALSE, message=FALSE, warning=FALSE, SubsetTheData}
 loanSubset <- subset(loanData, select = c(
   Term, 
   LoanStatus,
@@ -61,8 +55,6 @@ loanSubset <- subset(loanData, select = c(
 ))
 ```
 
-> Now that I have the subset that I want to work with, I will clean it up a bit by removing a few of the NA values and adding factors to IncomeRange, Term and CreditGrade. IncomeRange and CreditGrade will ibe ordered factors.
-
 ```{r echo=FALSE, message=FALSE, warning=FALSE, CleanAndRemoveNA}
 loanSubset$IncomeRange <- factor(loanSubset$IncomeRange, 
                                  levels=c("$1-24,999", "$25,000-49,999", 
@@ -82,16 +74,8 @@ loans$CreditGrade <- factor(loans$CreditGrade,
 
 # Univariate Plots Section
 
-> **Tip**: In this section, you should perform some preliminary exploration of
-your dataset. Run some summaries of the data and create univariate plots to
-understand the structure of the individual variables in your dataset. Don't
-forget to add a comment after each plot or closely-related group of plots!
-  There should be multiple code chunks and text sections; the first one below is
-just to help you get started.
-
-
 ### Variables I will be working with
-```{r Variable Names, echo=FALSE, message=TRUE, warning=TRUE}
+```{r Variable Names, echo=FALSE, message=TRUE, warning=FALSE}
 names(loans)
 ```
 
@@ -113,19 +97,21 @@ names(loans)
 - MonthlyLoanPayment
 
 ### Borrower APR
-```{r echo=FALSE, message=FALSE, warning=FALSE, BorrowerAPR}
+```{r BorrowerRate, echo=FALSE, message=FALSE, warning=FALSE}
+summary(loans$BorrowerRate)
+
 qplot(x = BorrowerRate, data = loans, binwidth = 0.005) +
   scale_x_continuous(limits = c(0,0.36), breaks = seq(0,0.36,0.02)) +
   scale_y_continuous(breaks = seq(0,6000,500))
-summary(loans$BorrowerRate)
 ```
 
-> This graph is interesting as it is has a fairly normal distribution save for the rate at 32% the amount jumps up to over 4500.
+This graph is interesting as it is has a fairly normal distribution save for the rate at 32% the amount jumps up to over 4500.
 
 
 ### Stated Monthly Income
 ```{r echo=FALSE, message=FALSE, warning=FALSE, StatedMonthlyIncome}
 summary(loans$StatedMonthlyIncome)
+
 income1 <- ggplot(aes(x = StatedMonthlyIncome), data = loans) +
   geom_histogram(binwidth = 500) +
   xlim(0, 20000) +
@@ -138,22 +124,48 @@ income2 <- ggplot(loans, aes(x = StatedMonthlyIncome)) +
 
 grid.arrange(income1, income2, ncol = 1)
 ```
-> You can see on this graph that the plot peaks at about $3,000 per month and then decreases. I had to limit the x axis as there is an outlier that skews the graph to a point that is unreadable. 
+
+You can see on this graph that the plot peaks at about $3,000 per month and then decreases. I had to limit the x axis as there is an outlier that skews the graph to a point that is unreadable. 
 
 
 ### Term
 
-```{r echo=FALSE, message=FALSE, warning=FALSE, Term}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 summary(loans$Term)
 
 qplot(Term, data = loans)
 ```
 
-> The types of loans fall into 3 different terms 12, 36, or 60 months. Or 1, 3, or 5 years respectively. The most common term is 3 years with over 73,000 loans.
+The types of loans fall into 3 different terms 12, 36, or 60 months. Or 1, 3, or 5 years respectively. The most common term is 3 years with over 73,000 loans.
+
+### Credit Score
+
+```{r Credit Score, echo=FALSE, message=FALSE, warning=FALSE}
+summary(loans$CreditScoreRangeUpper)
+summary(loans$CreditScoreRangeLower)
+
+ggplot(loans, aes(CreditScoreRangeLower, CreditScoreRangeUpper)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous(limits = c(500,900), breaks = seq(500,900,50)) +
+  scale_y_continuous(limits = c(500,900), breaks = seq(500,900,50))
+
+csUpper <- ggplot(loans, aes(x = 1, CreditScoreRangeUpper)) +
+  geom_boxplot() +
+  stat_summary(fun.y = mean, geom = 'point', shape = 4)
+
+csLower <- ggplot(loans, aes(x = 1, CreditScoreRangeLower)) +
+  geom_boxplot() +
+  stat_summary(fun.y = mean, geom = 'point', shape = 4)
+
+grid.arrange(csUpper, csLower, ncol = 2)
+```
+
+By reviewing the relationship between CreditScoreUpper and CreditScoreLower, you can see that there is only a difference of about 19 points accross the charts. The median upper credit score is 709 while the median lower credit score is 609.
 
 ### Credit Score effect on Rate
 
-```{r echo=FALSE, message=FALSE, warning=FALSE, CreditVRate}
+```{r CS effect on Rate, echo=FALSE, message=FALSE, warning=FALSE}
 CreditRate1 <- ggplot(aes(x = CreditScoreRangeUpper, y = BorrowerRate), data = loans) +
   geom_point()
 
@@ -167,17 +179,96 @@ CreditRate3 <- ggplot(aes(x = CreditScoreRangeUpper, y = BorrowerRate), data = l
 grid.arrange(CreditRate1, CreditRate2, CreditRate3)
 ```
 
-> This scatter plot was very difficult to see any relation between Credit Score and Borrower Rate. I transformed the data so the plotted points were more transparent and added a linear regression line. You can see that the the interest rate decreases as the credit score improves. 
+This scatter plot was very difficult to see any relation between Credit Score and Borrower Rate. I transformed the data so the plotted points were more transparent and added a linear regression line. You can see that the the interest rate decreases as the credit score improves. 
 
 ### CreditGrade
 
-```{r echo=FALSE, message=FALSE, warning=FALSE, CreditGrade}
+```{r CreditGrade, echo=FALSE, message=FALSE, warning=FALSE}
+summary(loans$CreditGrade)
+
 qplot(data = loans, x = CreditGrade) +
   xlim("AA", "A", "B", "C", "D", "E", "HR")
-summary(loans$CreditGrade)
 ```
 
-> Customer are given a credit grade when provided a loan by Prosper Bank. AA would be the highest score with HR (High Risk) being at the lower end. Most customs have a score between B and D. I am not including NA values in this graph.
+Customer are given a credit grade when provided a loan by Prosper Bank. AA would be the highest score with HR (High Risk) being at the lower end. Most customs have a score between B and D. I am not including NA values in this graph.
+
+### Credit Lines
+
+```{r CreditLines, echo=FALSE, message=FALSE, warning=FALSE}
+summary(loans$OpenCreditLines)
+
+qplot(data = loans, OpenCreditLines)
+
+qplot(data = loans, OpenCreditLines, binwidth = 1) +
+  scale_x_continuous(limits = c(0,25), breaks = seq(0,25,1))
+```
+
+You can see from this graph that most people have around 7 open credit lines with a median of 9. 
+
+### Borrower State
+
+```{r BorrowerState, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(loans,aes(BorrowerState))+
+  geom_bar() + 
+  scale_y_continuous(limits = c(0,15000), breaks = seq(0,15000,2500)) +
+  theme_minimal(base_size = 8)
+```
+
+You can see that Prosper Bank operates out of each of the 50 United States but has most of its loans located in California. This makes sence as Prosper Bank is headquartered out of California. 
+
+
+### Is there a relationship between amount delinquent and DTI Ratio?
+
+```{r}
+
+  
+plot1 <- ggplot(data = loans, aes(x = AmountDelinquent)) +
+  geom_bar() +
+  scale_x_continuous(limits = c(0,1000), breaks = seq(0,1000,50)) +
+  scale_y_continuous(limits = c(0,75)) 
+
+plot2 <- ggplot(data = loans, aes(x = DebtToIncomeRatio)) +
+  geom_histogram(binwidth = 0.01) +
+  scale_x_continuous(limits = c(0,2))
+
+grid.arrange(plot1, plot2, ncol = 1)
+
+ggplot(data = loans, aes(x = 1, y = DebtToIncomeRatio)) + 
+  geom_boxplot() +
+  coord_cartesian(ylim = c(0, .75), expand = "FALSE")
+
+```
+
+
+
+
+### Current Delinquencies
+> In order to get a better idea of the number of delinquencies in our set, we'll set the number of delinquencies as factor for our summary.  That will give us the number of loans with each particular number of delinquencies.  We can also zoom in on a section of the tail with our second plot, and then zoom out again by transforming our data in our third plot and using a boxplot to see outliers in the fourth plot.
+
+```{r CurrentDelinquencies, echo=FALSE, message=FALSE, warning=FALSE}
+delinq1 <- qplot(data = loans, CurrentDelinquencies)
+delinq2 <- ggplot(data = loans, aes(CurrentDelinquencies)) +
+  geom_histogram(binwidth = 1) +
+  scale_x_continuous(limits = c(0,20), breaks = seq(0,20,5)) +
+  scale_y_continuous(limits = c(0,11000), breaks = seq(0,11000,1000))
+delinq3 <- qplot(data = loans, log10(CurrentDelinquencies))
+delinq4 <- ggplot(data = loans, aes(x = 1, CurrentDelinquencies)) +
+  geom_boxplot()
+```
+
+
+### Amount Delinquent
+
+```{r Amount Delinquent, echo=FALSE, message=FALSE, warning=FALSE}
+table(as.factor(loans$CurrentDelinquencies))
+delin_plot1 <- qplot(CurrentDelinquencies, data = loans)
+delin_plot2 <- ggplot(loans, aes(CurrentDelinquencies)) +
+  geom_histogram(binwidth = 1) +
+  scale_x_continuous(limits = c(0,18), breaks = seq(0,18,2)) +
+  scale_y_continuous(limits = c(0,11000), breaks = seq(0,11000,1000))
+delin_log10 <- qplot(log10(CurrentDelinquencies), data = loans)
+
+```
 
 
 # Univariate Analysis
