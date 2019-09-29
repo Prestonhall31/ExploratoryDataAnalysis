@@ -1,22 +1,33 @@
-Prosper Loan Data Analysis by Preston Hall
-========================================================
-  
+---
+title: "Prosper Loan Data Analysis"
+author: "Preston Hall"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    # theme of html document
+    # theme of code highlight                                 
+    # table of contents
+    theme       : cosmo            # "default", "cerulean", "journal",
+                                    # "flatly", "readable", "spacelab",
+                                    # "united", "cosmo", "lumen", "paper", 
+                                    # "sandstone", "simplex", "yeti"
+    highlight   : tango          # "default", "tango", "pygments",
+                                    # "kate",  "monochrome", "espresso",
+                                    # "zenburn", "haddock", "textmate"
+    toc         : true              # get table of content
+    toc_depth   : 3
+    toc_float   : true
+    code_folding: hide
+    number_sections: yes
+    fig_caption: yes
+    df_print    : paged
+
+---
 
 > We will be using the data provided by Prosper Bank loans. Prosper Bank has facilitated more than $12 billion in loans to more than 770,000 people. You can find more information about Prosper Bank at their [website.](www.prosper.com)  
 
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
-# Load all of the packages that you end up using in your analysis in this code
-# chunk.
-
-# Notice that the parameter "echo" was set to FALSE for this code chunk. This
-# prevents the code from displaying in the knitted HTML output. You should set
-# echo=FALSE for all code chunks in your file, unless it makes sense for your
-# report to show the code that generated a particular plot.
-
-# The other parameters for "message" and "warning" should also be set to FALSE
-# for other code chunks once you have verified that each plot comes out as you
-# want it to. This will clean up the flow of your report.
 library(ggplot2)
 library(ggthemes)
 library(gridExtra)
@@ -28,6 +39,11 @@ library(lubridate)
 library(tidyverse)
 library(GGally)
 library(scales)
+# knitr: Suppress code/messages/warnings 
+#        Set default plot options and center them
+knitr::opts_chunk$set(fig.width=9,fig.height=5,fig.path='Figs/',
+                      fig.align='center',tidy=TRUE,
+                      echo=FALSE,warning=FALSE,message=FALSE)
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, Load_the_Data}
@@ -36,6 +52,7 @@ loanData <- read.csv('prosperLoanData.csv')
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, SubsetTheData}
+# Create a subset of the data
 loanSubset <- subset(loanData, select = c(
   Term, 
   ListingCreationDate,
@@ -58,6 +75,7 @@ loanSubset <- subset(loanData, select = c(
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, CleanAndRemoveNA}
+# Change the IncomeRange variable to an ordered factor
 loanSubset$IncomeRange <- factor(loanSubset$IncomeRange, 
                                  levels=c("$1-24,999", "$25,000-49,999", 
                                           "$50,000-74,999", "$75,000-99,999", 
@@ -65,10 +83,11 @@ loanSubset$IncomeRange <- factor(loanSubset$IncomeRange,
                                  ordered=TRUE, 
                                  exclude = "Not displayed")
 
-loanSubset$Term <- as.factor(loanSubset$Term)
+loanSubset$Term <- as.factor(loanSubset$Term) #Factor term
 
-loans <- na.exclude(loanSubset)
+loans <- na.exclude(loanSubset) # Final dataset we will be using and removing NA values
 
+# Created Ordered factor for CreditGrade
 loans$CreditGrade <- factor(loans$CreditGrade, 
                             levels = c("AA", "A", "B", "C", "D", "E", "HR", "NC"), 
                             ordered = TRUE)
@@ -119,22 +138,26 @@ This graph is interesting as it is has a fairly normal distribution save for the
 
 ### Stated monthly income
 
-```{r echo=FALSE, message=FALSE, warning=FALSE, StatedMonthlyIncome}
+```{r StatedMonthlyIncome, echo=FALSE, message=FALSE, warning=FALSE}
+# First graph
 income1 <- ggplot(aes(x = StatedMonthlyIncome), data = loans) +
   geom_histogram() +
   xlab('Stated Monthly Income in USD') +
   ylab('Number of Applicants')
 
+# Second graph but with a limiter and adjusting binwidth to 500
 income2 <- ggplot(aes(x = StatedMonthlyIncome), data = loans) +
   geom_histogram(binwidth = 500) +
   xlim(0, 20000) +
   xlab('Stated Monthly Income in USD') +
   ylab('Number of Applicants')
 
+# Third graph to show density of Income
 income3 <- ggplot(loans, aes(x = StatedMonthlyIncome)) +
   geom_density() +
   xlim(0, 20000)
 
+# Using grid.arrange to plot all graphs next to eachother
 grid.arrange(income1, income2, income3, ncol = 1)
 
 summary(loans$StatedMonthlyIncome)
@@ -224,7 +247,7 @@ The first graph is difficult to see as there are several outliers that stretch t
 
 ```{r loanStatus, echo=FALSE, message=FALSE, warning=FALSE}
 qplot(data = loans, LoanStatus) +
-  coord_flip()
+  coord_flip() # Flip histogram on its side
 
 qplot(data = loans, LoanStatus) +
   xlim("Past Due (1-15 days)",
@@ -233,7 +256,7 @@ qplot(data = loans, LoanStatus) +
        "Past Due (61-90 days)",
        "Past Due (91-120 days)",
        "Past Due (>120 days)") +
-  theme(axis.text.x=element_text(angle=45, hjust=1))
+  coord_flip() # Flip histogram on its side
 
 summary(loans$LoanStatus)
 ```
@@ -290,7 +313,7 @@ It was interesting to see the box plot of the Debt to income ratio. There were s
 ggplot(loans, aes(CreditScoreRangeLower, CreditScoreRangeUpper)) +
   geom_point() +
   geom_line() +
-  scale_x_continuous(limits = c(500,900), breaks = seq(500,900,50)) +
+  scale_x_continuous(limits = c(500,900), breaks = seq(500,900,50)) + 
   scale_y_continuous(limits = c(500,900), breaks = seq(500,900,50))
 
 summary(loans$CreditScoreRangeUpper)
@@ -298,7 +321,7 @@ summary(loans$CreditScoreRangeLower)
 
 csUpper <- ggplot(loans, aes(x = 1, CreditScoreRangeUpper)) +
   geom_boxplot() +
-  stat_summary(fun.y = mean, geom = 'point', shape = 4)
+  stat_summary(fun.y = mean, geom = 'point', shape = 4) # Places an 'x' on the boxplot where the mean is
 
 csLower <- ggplot(loans, aes(x = 1, CreditScoreRangeLower)) +
   geom_boxplot() +
@@ -328,7 +351,7 @@ CreditRate1 <- ggplot(aes(x = CreditScoreRangeUpper, y = BorrowerRate), data = l
   geom_point()
 
 CreditRate2 <- ggplot(aes(x = CreditScoreRangeUpper, y = BorrowerRate), data = loans) +
-  geom_jitter(alpha = 1/50, position = position_jitter(h = 0)) 
+  geom_jitter(alpha = 1/50, position = position_jitter(h = 0)) # Adds a small amount of noise to view better
 
 CreditRate3 <- ggplot(aes(x = CreditScoreRangeUpper, y = BorrowerRate), data = loans) +
   geom_jitter(alpha = 1/50, position = position_jitter(h = 0)) +
@@ -343,13 +366,13 @@ This scatter plot was very difficult to see any relation between Credit Score an
 ### Credit Grade vs Credit Score 
 
 ```{r CreditGrade/CreditScore Table, echo=FALSE, message=FALSE, warning=FALSE}
-credit_grade_group <- group_by(loans, CreditGrade)
+credit_grade_group <- group_by(loans, CreditGrade) # Creating a group based on Credit Grade
 loans.cg_group <- summarise(credit_grade_group,
-                            credit_score_mean = mean(CreditScoreRangeLower),
-                            credit_score_median = median(CreditScoreRangeLower),
-                            n = n())
+                            credit_score_mean = mean(CreditScoreRangeLower), # Mean of Credit Score
+                            credit_score_median = median(CreditScoreRangeLower), # Median of Credit Score
+                            n = n()) # Quantity
 
-loans.cg_group <- arrange(loans.cg_group, CreditGrade)
+loans.cg_group <- arrange(loans.cg_group, CreditGrade) # arranges by CreditGrade
 
 loans.cg_group
 ```
@@ -360,13 +383,15 @@ I was curious to see if the credit grade is solely determined on credit score or
 ### Credit Score Range and Debt To Income Ratio
 
 ```{r CS and DTI, echo=FALSE, message=FALSE, warning=FALSE}
+# Compares Credit Score and DTI
 ggplot(aes(x = CreditScoreRangeUpper, y = DebtToIncomeRatio), data = loans) +
-  coord_cartesian(xlim = c(500, 900), ylim = c(0, 1), expand = "FALSE") +
+  coord_cartesian(xlim = c(500, 900), ylim = c(0, 1), expand = "FALSE") + # coord_cartesian allows zoom without changing the underlying data
     geom_point(alpha = 0.1,
-             position = position_jitter(h = 0),
+             position = position_jitter(h = 0), # Adds noise
              color = 'green') +
+  # Adds lines based on mean and quartile percentage with color attributes
   geom_line(stat = 'summary', fun.y = mean, 
-            color = "red") +
+            color = "red") + 
   geom_line(stat = 'summary', fun.y = quantile, 
             fun.args = list(probs = .1), 
             linetype = "dashed", color = "blue") +
@@ -403,9 +428,11 @@ I created a Credit Grade Group variable to see see if the loans were grouped tog
 
 ```{r SMI, DTI, CS, echo=FALSE, message=FALSE, warning=FALSE}
 ggplot(aes(StatedMonthlyIncome, DebtToIncomeRatio, color = CreditScoreRangeUpper), data = loans) +
-  geom_point() +
+  geom_point() + #Scatterplot
   scale_x_continuous(limits = c(0,10000)) +
-  scale_y_continuous(limits = c(0,3))
+  scale_y_continuous(limits = c(0,3)) +
+  scale_color_gradient2(midpoint = median(loans$CreditScoreRangeUpper)) +
+  theme_dark()
 ```
 
 You can see on this graph that a large percentage of borrowers fall below a DTI of 1. However, it is far more likely for a borrower to have a higher debt to income ratio if their income is less than $2,500. By added a color attribute to Credit Score, it is easy to see that most of the lower credit scores are in the lower income range and usually have a higher DTI. 
@@ -415,8 +442,8 @@ You can see on this graph that a large percentage of borrowers fall below a DTI 
 
 ```{r CG, BR, Term, echo=FALSE, message=FALSE, warning=FALSE}
 ggplot(loans, aes(Term, BorrowerRate)) +
-  geom_boxplot(aes(group = Term)) +
-  facet_wrap(~CreditGrade) 
+  geom_boxplot(aes(group = Term)) + # Grouped by term
+  facet_wrap(~CreditGrade) # Wraps a 1d sequense of panels into 2d
 ggplot(loans, aes(CreditGrade,BorrowerRate, color = Term)) +
   geom_boxplot() +
   coord_flip()
@@ -424,6 +451,7 @@ ggplot(loans, aes(CreditGrade,BorrowerRate, color = Term)) +
 
 I wanted to see the relationship between CreditGrade, BorrowerRate and Term to see if there was a major effect and the different variables and I mistakenly discovered that Prosper Bank has not provided credit grades to terms other than 36 months. Not the information I was expecting but certainly useful in getting a full picture of the data. 
 
+### Credit Score and Borrower Rate
 
 ```{r Rate, CS and Term, echo=FALSE, message=FALSE, warning=FALSE}
 ggplot(loans, aes(CreditScoreRangeUpper,BorrowerRate, color = Term)) +
@@ -438,13 +466,23 @@ This graph shows a better relationship between the 3 variables that I was not ab
 ### Scatterplot Matrix
 
 ```{r Scatterplot Matix, echo=FALSE, message=FALSE, warning=FALSE}
-set.seed(1)
+# Since the data is randamized, setting the seed guarantees same result
+set.seed(1) 
 
+# Etracting year from date
 loans$listYear <- format(as.Date(loans$listDate, format="%Y-%m-%d"),"%Y")
 
+# Grabbing a random sample of 25,000
 ggpairs(loans[sample.int(nrow(loans), 25000),],
-        columns = c(4, 8, 13:14, 16:17),
-        ggplot2::aes(colour = listYear, alpha = 0.1))
+        # Choosing which columns to use from loans df
+        columns = c(4, 8, 13:14, 16:17), 
+        # Plotting using ggplot2
+        ggplot2::aes(colour = listYear, alpha = 0.1)) +
+  theme(text = element_text(size=10), 
+     axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size=7),
+             panel.grid.minor = element_blank(), 
+             panel.grid.major = element_blank())  # rotate and resize axis labels
+                                                  # and remove grid lines
 ```
 
 Running a scatterplot matrix, I was able to graph a large amount of information into several table to compare. For this, I used a sample size of 25,000 that showed correlation coefficients for 6 of the quantitative variable and shows the year based on color. 
@@ -477,6 +515,7 @@ The Scatterplot Matix was able to provide a lot of information on the variables 
 ## Plot One
 
 ```{r Plot1, echo=FALSE, message=FALSE, warning=FALSE}
+# Collapsing the LoanStatus into fewer groups
 loans$LoanStatus <- fct_collapse(loans$LoanStatus, 
                                  ChargedOff = "Chargedoff", 
                                  Completed = "Completed", 
@@ -490,13 +529,15 @@ loans$LoanStatus <- fct_collapse(loans$LoanStatus,
                                              "Past Due (91-120 days)", 
                                              "Past Due (>120 days)"))
 
+# Choosing colors for LoanStatus
 cols <- c(ChargedOff = "black", Completed = "blue", Current = "green", Defaulted = "red", PastDue = "orange", Cancelled = "black")
 
+
 ggplot(aes(x = listDate, y = CreditScoreRangeLower), data = loans) +
-  geom_jitter(aes(colour = LoanStatus), alpha = 0.5) +
-  geom_smooth() +
-  scale_colour_manual(values = cols) +
-  theme_dark() +
+  geom_jitter(aes(colour = LoanStatus), alpha = 0.5) + # Adds noise
+  geom_smooth() + # Aids with seeing patterns by adding a line
+  scale_colour_manual(values = cols) + # Changes color bases on col variable
+  theme_dark() + # Theme Style
   ggtitle("Breakdown of Credit Score over the years and the loan status") +
   labs(x = "Date of Loan", y = "Credit Score", color = "Loan Status")
 
@@ -519,6 +560,7 @@ The green points are most populated on the right of the graph. This makes sense 
 ggplot(loans, aes(DebtToIncomeRatio,BorrowerRate, color = CreditScoreRangeUpper)) +
   geom_point(alpha = 0.5) +
   geom_smooth() +
+  # Adds limits and provides a break in labels based off of a sequence provided
   scale_y_continuous(limits = c(0.04,0.36), breaks = seq(0.04,0.36,0.02)) +
   scale_x_continuous(limits = c(0,1.5), breaks = seq(0,1.5,0.25)) +
   ggtitle("How APR is effected by Credit Score and DTI") +
@@ -534,10 +576,10 @@ ggplot(loans, aes(DebtToIncomeRatio,BorrowerRate, color = CreditScoreRangeUpper)
 
 ```{r Plot3, echo=FALSE, message=FALSE, warning=FALSE}
 ggplot(aes(x = IncomeRange, y = LoanOriginalAmount, color = Term), data = loans) +
-  geom_boxplot(fill = "grey") +
+  geom_boxplot(fill = "grey") + # fills the box with a color
   scale_y_continuous(breaks = seq(0,35000,5000)) +
   ggtitle("Impact of Income on Loan Amount and Term") +
-  labs(x = "Income Range", y = "Original Loan Amount", color = "Loan Term") +
+  labs(x = "Income Range ($)", y = "Original Loan Amount ($)", color = "Loan Term in Months") +
   theme_dark()
 ```
 
