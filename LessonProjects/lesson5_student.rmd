@@ -76,7 +76,10 @@ head(pf.fc_by_age_gender.wide)
 Notes:
 
 ```{r Ratio Plot}
-
+ggplot(aes(x = age, y = female/male),
+       data = pf.fc_by_age_gender.wide) +
+  geom_line() +
+  geom_hline(yintercept = 1, alpha = 0.3, linetype = 2)
 ```
 
 ***
@@ -85,7 +88,7 @@ Notes:
 Notes:
 
 ```{r Third Quantitative Variable}
-
+pf$year_joined <- floor2014 - pf$tenure / 365
 ```
 
 ***
@@ -186,7 +189,13 @@ Notes:
 Notes:
 
 ```{r Histograms Revisited}
+yo <- read.csv('yogurt.csv')
+str(yo)
 
+
+# Change the id from an int to a factor
+yo$id <- factor(yo$id)
+str(yo)
 ```
 
 ***
@@ -195,7 +204,7 @@ Notes:
 Notes:
 
 ```{r Number of Purchases}
-
+qplot(data = yo, x = price, fill = I('#F79420'))
 ```
 
 ***

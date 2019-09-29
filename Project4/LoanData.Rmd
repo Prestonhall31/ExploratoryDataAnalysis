@@ -3,12 +3,7 @@ Prosper Loan Data Analysis by Preston Hall
   
 
 > We will be using the data provided by Prosper Bank loans. Prosper Bank has facilitated more than $12 billion in loans to more than 770,000 people. You can find more information about Prosper Bank at their [website.](www.prosper.com)  
-<br>
-I have worked in the financial industry for close to 10 years and have serviced and reviewed many loan documents. I am excited to analyze this data and discover new information.
-<br>
-The data that we are exploring is provided in a .csv file 86.5 MB. There are a total of 81 variables and 113,937 observations. There is information than what isneeded for this project so I will subest it out to 16 different varaiables and remove all of the NA values.
-<br>
-> After I have created the subset that I want to work with, I will clean it up a bit by removing a few of the NA values and adding factors to IncomeRange, Term and CreditGrade. IncomeRange and CreditGrade will be ordered factors.
+
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
 # Load all of the packages that you end up using in your analysis in this code
@@ -27,6 +22,12 @@ library(ggthemes)
 library(gridExtra)
 library(stringr)
 library(plyr)
+library(dplyr)
+library(reshape2)
+library(lubridate)
+library(tidyverse)
+library(GGally)
+library(scales)
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, Load_the_Data}
@@ -37,10 +38,10 @@ loanData <- read.csv('prosperLoanData.csv')
 ```{r echo=FALSE, message=FALSE, warning=FALSE, SubsetTheData}
 loanSubset <- subset(loanData, select = c(
   Term, 
+  ListingCreationDate,
   LoanStatus,
   BorrowerRate,
   BorrowerState,
-  Occupation,
   EmploymentStatus,
   CreditScoreRangeLower,
   CreditScoreRangeUpper,
@@ -51,7 +52,8 @@ loanSubset <- subset(loanData, select = c(
   DebtToIncomeRatio,
   StatedMonthlyIncome,
   IncomeRange,
-  MonthlyLoanPayment
+  MonthlyLoanPayment, 
+  LoanOriginalAmount
 ))
 ```
 
@@ -72,18 +74,20 @@ loans$CreditGrade <- factor(loans$CreditGrade,
                             ordered = TRUE)
 ```
 
-# Univariate Plots Section
 
-### Variables I will be working with
-```{r Variable Names, echo=FALSE, message=TRUE, warning=FALSE}
-names(loans)
-```
+### Variables I will be analyzing
+
+I have worked in the financial industry for close to 10 years and have serviced and reviewed many loan documents. I am excited to analyze this data and discover new information.
+
+The data that we are exploring is provided in a .csv file 86.5 MB. There are a total of 81 variables and 113,937 observations. There is more information than what is needed for my analysis so I will subest it out to 17 different varaiables and remove all of the NA values. Keeping all of the information will slow down my code and make it difficult to parse through all of the unnecessary information.
+
+After I have created the subset that I want to work with, I will clean it up a bit by removing a few of the NA values and adding factors to IncomeRange, Term and CreditGrade. IncomeRange and CreditGrade will be ordered factors. I will focussing on the following variables:
 
 - Term
+- ListingCreationDate
 - LoanStatus
 - BorrowerRate
 - BorrowerState
-- Occupation
 - EmploymentStatus
 - CreditScoreRangeLower
 - CreditScoreRangeUpper
@@ -95,60 +99,202 @@ names(loans)
 - StatedMonthlyIncome
 - IncomeRange
 - MonthlyLoanPayment
+- LoanOriginalAmount
 
-### Borrower APR
+# Univariate Plots Section
+
+
+### Borrower rate
+
 ```{r BorrowerRate, echo=FALSE, message=FALSE, warning=FALSE}
-summary(loans$BorrowerRate)
-
 qplot(x = BorrowerRate, data = loans, binwidth = 0.005) +
   scale_x_continuous(limits = c(0,0.36), breaks = seq(0,0.36,0.02)) +
   scale_y_continuous(breaks = seq(0,6000,500))
+
+summary(loans$BorrowerRate)
 ```
 
-This graph is interesting as it is has a fairly normal distribution save for the rate at 32% the amount jumps up to over 4500.
+This graph is interesting as it is has a fairly normal distribution save for the rate at 32% the amount jumps up to over 4500. I am interested in the lull between 32% and 35% and wonder why the numbers drop so low for this rate. 
 
 
-### Stated Monthly Income
+### Stated monthly income
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE, StatedMonthlyIncome}
-summary(loans$StatedMonthlyIncome)
-
 income1 <- ggplot(aes(x = StatedMonthlyIncome), data = loans) +
+  geom_histogram() +
+  xlab('Stated Monthly Income in USD') +
+  ylab('Number of Applicants')
+
+income2 <- ggplot(aes(x = StatedMonthlyIncome), data = loans) +
   geom_histogram(binwidth = 500) +
   xlim(0, 20000) +
   xlab('Stated Monthly Income in USD') +
   ylab('Number of Applicants')
 
-income2 <- ggplot(loans, aes(x = StatedMonthlyIncome)) +
+income3 <- ggplot(loans, aes(x = StatedMonthlyIncome)) +
   geom_density() +
   xlim(0, 20000)
 
-grid.arrange(income1, income2, ncol = 1)
+grid.arrange(income1, income2, income3, ncol = 1)
+
+summary(loans$StatedMonthlyIncome)
 ```
 
-You can see on this graph that the plot peaks at about $3,000 per month and then decreases. I had to limit the x axis as there is an outlier that skews the graph to a point that is unreadable. 
+There is an outlier that extends the tail of the graph too far to the right and the graph becomes unreadable. I added a limit to the x axis to better view the information. You can see on this graph that the plot peaks at about $3,000 per month and then decreases. I had to limit the x axis as there is an outlier that skews the graph to a point that is unreadable. 
 
 
-### Term
+### Loan Term 
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-summary(loans$Term)
-
 qplot(Term, data = loans)
+
+summary(loans$Term)
 ```
 
 The types of loans fall into 3 different terms 12, 36, or 60 months. Or 1, 3, or 5 years respectively. The most common term is 3 years with over 73,000 loans.
 
-### Credit Score
+
+### Credit Grades
+
+```{r CreditGrade, echo=FALSE, message=FALSE, warning=FALSE}
+qplot(data = loans, x = CreditGrade) +
+  xlim("AA", "A", "B", "C", "D", "E", "HR")
+
+summary(loans$CreditGrade)
+```
+
+Customer are given a credit grade when provided a loan by Prosper Bank. AA would be the highest score with HR (High Risk) being at the lower end. Most customs have a score between B and D. I am not including NA values in this graph.
+
+
+### Open Credit lines
+
+```{r CreditLines, echo=FALSE, message=FALSE, warning=FALSE}
+qplot(data = loans, OpenCreditLines)
+
+qplot(data = loans, OpenCreditLines, binwidth = 1) +
+  scale_x_continuous(limits = c(0,25), breaks = seq(0,25,1))
+
+summary(loans$OpenCreditLines)
+```
+
+This graph is right tailed distribution. I limited the number of open credit lines so to better see the data.  You can see from this graph that most people have around 7 open credit lines with a median of 9. 
+
+
+### Borrower state
+
+```{r BorrowerState, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(loans,aes(BorrowerState))+
+  geom_bar() + 
+  scale_y_continuous(limits = c(0,15000), breaks = seq(0,15000,2500)) +
+  theme_minimal(base_size = 8)
+```
+
+You can see that Prosper Bank operates out of each of the 50 United States but has most of its loans located in California. This makes sence as Prosper Bank is headquartered out of California. 
+
+
+### Debt to income ratio Histogram
+
+```{r Hist DTI Ratio, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x = DebtToIncomeRatio), data = loans) +
+  geom_histogram(binwidth = 0.01) +
+  scale_x_continuous(limits = c(0,1.5))
+
+summary(loans$DebtToIncomeRatio)
+```
+
+This graph shows a right tailed distribution with a peak in DTI ratio around 20%. Borrowers are less likely to be approved for a loan with a DTI over 32% based off of this information.
+
+### Debt to income ratio Box Plot
+
+```{r Box DTI, echo=FALSE, message=FALSE, warning=FALSE}
+boxplot1 <- ggplot(data = loans, aes(x = 1, y = DebtToIncomeRatio)) + 
+  geom_boxplot() 
+
+boxplot2 <- ggplot(data = loans, aes(x = 1, y = DebtToIncomeRatio)) + 
+  geom_boxplot() +
+  coord_cartesian(ylim = c(0, .75), expand = "FALSE")
+
+grid.arrange(boxplot1, boxplot2, ncol = 2)
+```
+
+The first graph is difficult to see as there are several outliers that stretch the graph too much. By using coord_cartesion with expand = FALSE allows us to zoom in on the graph. We can see that the median is 22%.
+
+
+### Loan Status
+
+```{r loanStatus, echo=FALSE, message=FALSE, warning=FALSE}
+qplot(data = loans, LoanStatus) +
+  coord_flip()
+
+qplot(data = loans, LoanStatus) +
+  xlim("Past Due (1-15 days)",
+       "Past Due (16-30 days)", 
+       "Past Due (31-60 days)",
+       "Past Due (61-90 days)",
+       "Past Due (91-120 days)",
+       "Past Due (>120 days)") +
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+
+summary(loans$LoanStatus)
+```
+
+It seems almost 3 times more likely to be 15 days late on the payment then it is to be 30 days or more. This makes sense as people are more likely to not let there loans go too far past due. What seems odd is that the amount stay similar from 16 days to 120 and then dropped significantly after that. 
+
+
+### By Year
+
+```{r ListingDate, echo=FALSE, message=FALSE, warning=FALSE}
+# Add listing date variable
+loans$ListingDateTime <- data.frame(do.call(rbind, strsplit(as.character(loans$ListingCreationDate), " ", 
+                                                 fixed = TRUE)))
+loans$listDate <- loans$ListingDate[[1]]
+loans$listTime <- loans$ListingDate[[2]]
+
+loans$listDate <- as.Date(loans$listDate, "%Y-%m-%d")
+
+qplot(data = loans, x = listDate)
+
+summary(loans$listDate)
+```
+
+The dates range from February of 2007 until March of 2014. It is interesting to see that there is a huge decrease to 0 around the end of 2008 and the graph slowly begins to climb back up. This is very likely due to the housing market crash of 2008. It looks like it took the bank several years to recover and then in 2014 loan amounts spike to almost 13,000.
+
+
+# Univariate Analysis
+
+> 113,937 observations with 81 different variables. This was a bit larger than what I was wanting to work with right away, so I created a subset of 16 variables and stripped the NA values and that brought the amount of observations down to 97,765. This was still plenty of information to draw conclusions from.
+<br>
+> You can see from the chart that credit score had a large and direct effect on the borrower’s interest rate. Rates were higher than 30% with borrower’s whose credit score was below 600 and the rate dropped to well below 10% for better credit. Prosper bank grouped the interest rates into their own credit scoring system. 
+
+> -	AA Median score of 780
+> -	A	Median score of 720
+> -	B	Median score of 680
+> -	C	Median score of 640
+> -	D 	Median score of 620
+> -	E	Median score of 560
+> -	HR 	Median score of 520
+
+> Out of the 16 variables used, I created graphs with BorrowerRate, StatedMonthlyIncome, Term, CreditGrade, LoanStatus, AmountDelinquent, DebtToIncomeRatio, BorrowerState, and OpenCreditLines.
+I wanted to get a bigger picture of the type of data I was working with. 
+<br>
+<br>
+It was interesting to see the box plot of the Debt to income ratio. There were several borrowers that had DTI well above 200% and some reached as high as 1000%. Looking closer at the graph, it was easier to see that the median was 22%
+
+
+# Bivariate Plots Section
+
+
+### Credit Score Range Upper vs Lower
 
 ```{r Credit Score, echo=FALSE, message=FALSE, warning=FALSE}
-summary(loans$CreditScoreRangeUpper)
-summary(loans$CreditScoreRangeLower)
-
 ggplot(loans, aes(CreditScoreRangeLower, CreditScoreRangeUpper)) +
   geom_point() +
   geom_line() +
   scale_x_continuous(limits = c(500,900), breaks = seq(500,900,50)) +
   scale_y_continuous(limits = c(500,900), breaks = seq(500,900,50))
+
+summary(loans$CreditScoreRangeUpper)
+summary(loans$CreditScoreRangeLower)
 
 csUpper <- ggplot(loans, aes(x = 1, CreditScoreRangeUpper)) +
   geom_boxplot() +
@@ -159,9 +305,21 @@ csLower <- ggplot(loans, aes(x = 1, CreditScoreRangeLower)) +
   stat_summary(fun.y = mean, geom = 'point', shape = 4)
 
 grid.arrange(csUpper, csLower, ncol = 2)
+
 ```
 
 By reviewing the relationship between CreditScoreUpper and CreditScoreLower, you can see that there is only a difference of about 19 points accross the charts. The median upper credit score is 709 while the median lower credit score is 609.
+
+
+### Credit Grade / Credit Score Boxplot
+
+```{r CreditGrade/CreditScore Boxplot, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(CreditGrade, CreditScoreRangeUpper), data = loans) +
+  geom_boxplot()
+```
+
+You can see the scores evenly distributed within the Credit Grades based on their number. AA score has a mean score of 780 and goes all the up to 900, the highest available score.
+
 
 ### Credit Score effect on Rate
 
@@ -181,214 +339,218 @@ grid.arrange(CreditRate1, CreditRate2, CreditRate3)
 
 This scatter plot was very difficult to see any relation between Credit Score and Borrower Rate. I transformed the data so the plotted points were more transparent and added a linear regression line. You can see that the the interest rate decreases as the credit score improves. 
 
-### CreditGrade
 
-```{r CreditGrade, echo=FALSE, message=FALSE, warning=FALSE}
-summary(loans$CreditGrade)
+### Credit Grade vs Credit Score 
 
-qplot(data = loans, x = CreditGrade) +
-  xlim("AA", "A", "B", "C", "D", "E", "HR")
+```{r CreditGrade/CreditScore Table, echo=FALSE, message=FALSE, warning=FALSE}
+credit_grade_group <- group_by(loans, CreditGrade)
+loans.cg_group <- summarise(credit_grade_group,
+                            credit_score_mean = mean(CreditScoreRangeLower),
+                            credit_score_median = median(CreditScoreRangeLower),
+                            n = n())
+
+loans.cg_group <- arrange(loans.cg_group, CreditGrade)
+
+loans.cg_group
 ```
 
-Customer are given a credit grade when provided a loan by Prosper Bank. AA would be the highest score with HR (High Risk) being at the lower end. Most customs have a score between B and D. I am not including NA values in this graph.
+I was curious to see if the credit grade is solely determined on credit score or if there were other factors that effected it. By looking at the table, it is clear that credit grade is only determined by the credit score of the borrower.
 
-### Credit Lines
 
-```{r CreditLines, echo=FALSE, message=FALSE, warning=FALSE}
-summary(loans$OpenCreditLines)
+### Credit Score Range and Debt To Income Ratio
 
-qplot(data = loans, OpenCreditLines)
-
-qplot(data = loans, OpenCreditLines, binwidth = 1) +
-  scale_x_continuous(limits = c(0,25), breaks = seq(0,25,1))
+```{r CS and DTI, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x = CreditScoreRangeUpper, y = DebtToIncomeRatio), data = loans) +
+  coord_cartesian(xlim = c(500, 900), ylim = c(0, 1), expand = "FALSE") +
+    geom_point(alpha = 0.1,
+             position = position_jitter(h = 0),
+             color = 'green') +
+  geom_line(stat = 'summary', fun.y = mean, 
+            color = "red") +
+  geom_line(stat = 'summary', fun.y = quantile, 
+            fun.args = list(probs = .1), 
+            linetype = "dashed", color = "blue") +
+  geom_line(stat = 'summary', fun.y = quantile, 
+            fun.args = list(probs = .5), 
+            color = "blue") +
+  geom_line(stat = 'summary', fun.y = quantile, 
+            fun.args = list(probs = .9), 
+            linetype = "dashed", color = "blue")
 ```
 
-You can see from this graph that most people have around 7 open credit lines with a median of 9. 
+It is interesting to see that there is a normal curve in this graph with a sudden dip in DTI right around a credit score of 650.
 
-### Borrower State
-
-```{r BorrowerState, echo=FALSE, message=FALSE, warning=FALSE}
-ggplot(loans,aes(BorrowerState))+
-  geom_bar() + 
-  scale_y_continuous(limits = c(0,15000), breaks = seq(0,15000,2500)) +
-  theme_minimal(base_size = 8)
-```
-
-You can see that Prosper Bank operates out of each of the 50 United States but has most of its loans located in California. This makes sence as Prosper Bank is headquartered out of California. 
-
-
-### Is there a relationship between amount delinquent and DTI Ratio?
-
-```{r}
-
-  
-plot1 <- ggplot(data = loans, aes(x = AmountDelinquent)) +
-  geom_bar() +
-  scale_x_continuous(limits = c(0,1000), breaks = seq(0,1000,50)) +
-  scale_y_continuous(limits = c(0,75)) 
-
-plot2 <- ggplot(data = loans, aes(x = DebtToIncomeRatio)) +
-  geom_histogram(binwidth = 0.01) +
-  scale_x_continuous(limits = c(0,2))
-
-grid.arrange(plot1, plot2, ncol = 1)
-
-ggplot(data = loans, aes(x = 1, y = DebtToIncomeRatio)) + 
-  geom_boxplot() +
-  coord_cartesian(ylim = c(0, .75), expand = "FALSE")
-
-```
-
-
-
-
-### Current Delinquencies
-> In order to get a better idea of the number of delinquencies in our set, we'll set the number of delinquencies as factor for our summary.  That will give us the number of loans with each particular number of delinquencies.  We can also zoom in on a section of the tail with our second plot, and then zoom out again by transforming our data in our third plot and using a boxplot to see outliers in the fourth plot.
-
-```{r CurrentDelinquencies, echo=FALSE, message=FALSE, warning=FALSE}
-delinq1 <- qplot(data = loans, CurrentDelinquencies)
-delinq2 <- ggplot(data = loans, aes(CurrentDelinquencies)) +
-  geom_histogram(binwidth = 1) +
-  scale_x_continuous(limits = c(0,20), breaks = seq(0,20,5)) +
-  scale_y_continuous(limits = c(0,11000), breaks = seq(0,11000,1000))
-delinq3 <- qplot(data = loans, log10(CurrentDelinquencies))
-delinq4 <- ggplot(data = loans, aes(x = 1, CurrentDelinquencies)) +
-  geom_boxplot()
-```
-
-
-### Amount Delinquent
-
-```{r Amount Delinquent, echo=FALSE, message=FALSE, warning=FALSE}
-table(as.factor(loans$CurrentDelinquencies))
-delin_plot1 <- qplot(CurrentDelinquencies, data = loans)
-delin_plot2 <- ggplot(loans, aes(CurrentDelinquencies)) +
-  geom_histogram(binwidth = 1) +
-  scale_x_continuous(limits = c(0,18), breaks = seq(0,18,2)) +
-  scale_y_continuous(limits = c(0,11000), breaks = seq(0,11000,1000))
-delin_log10 <- qplot(log10(CurrentDelinquencies), data = loans)
-
-```
-
-
-# Univariate Analysis
-
-> **Tip**: Now that you've completed your univariate explorations, it's time to
-reflect on and summarize what you've found. Use the questions below to help you
-gather your observations and add your own if you have other thoughts!
-
-### What is the structure of your dataset?
-```{r}
-dim(loanData)
-# structure(loanData)
-```
-
-### What is/are the main feature(s) of interest in your dataset?
-
-### What other features in the dataset do you think will help support your \
-investigation into your feature(s) of interest?
-
-### Did you create any new variables from existing variables in the dataset?
-
-### Of the features you investigated, were there any unusual distributions? \
-Did you perform any operations on the data to tidy, adjust, or change the form \
-of the data? If so, why did you do this?
-
-
-# Bivariate Plots Section
-
-> **Tip**: Based on what you saw in the univariate plots, what relationships
-between variables might be interesting to look at in this section? Don't limit
-yourself to relationships between a main output feature and one of the
-supporting variables. Try to look at relationships between supporting variables
-as well.
-
-```{r echo=FALSE, Bivariate_Plots}
-
-```
 
 # Bivariate Analysis
 
-> **Tip**: As before, summarize what you found in your bivariate explorations
-here. Use the questions below to guide your discussion.
 
-### Talk about some of the relationships you observed in this part of the \
-investigation. How did the feature(s) of interest vary with other features in \
-the dataset?
-  
-  ### Did you observe any interesting relationships between the other features \
-  (not the main feature(s) of interest)?
-  
-  ### What was the strongest relationship you found?
-  
-  
-  # Multivariate Plots Section
-  
-  > **Tip**: Now it's time to put everything together. Based on what you found in
-the bivariate plots section, create a few multivariate plots to investigate
-more complex interactions between variables. Make sure that the plots that you
-create here are justified by the plots you explored in the previous section. If
-you plan on creating any mathematical models, this is the section where you
-will do that.
+> I analyzed the relationship of the credit score in this section by using different charts to visualize the relationship of the data. CreditScoreRangeUpper and CreditScoreRangeLower are similarly related and only varying by 20 points from each other. I wanted to dig deep into the credit analysis of this data and see what the relationships were like between the different variables and to see if there was any correlation.
+<br>
+<br>
+When comparing the credit score and DTI ratio, it showed an unforseen dip in the DTI by about 10% around a credit score of 650 and then went right back up when the credit score reaches 700. 
+<br> 
+<br>
+The Credit score had a strong effect on the borrower rate. It was difficult to see the relationship at first but by adding the linear regression line, it was prominent that the better the credit score, the better the rate.
+<br>
+<br>
+I created a Credit Grade Group variable to see see if the loans were grouped together by Credit Score only or if there may be another variable involved. Based on my analysis, the Credit Grade Group is only determined by credit score.
 
-```{r echo=FALSE, Multivariate_Plots}
+  
+# Multivariate Plots Section
+  
 
+### Stated monthly income, DTI and credit score?
+
+```{r SMI, DTI, CS, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(StatedMonthlyIncome, DebtToIncomeRatio, color = CreditScoreRangeUpper), data = loans) +
+  geom_point() +
+  scale_x_continuous(limits = c(0,10000)) +
+  scale_y_continuous(limits = c(0,3))
 ```
+
+You can see on this graph that a large percentage of borrowers fall below a DTI of 1. However, it is far more likely for a borrower to have a higher debt to income ratio if their income is less than $2,500. By added a color attribute to Credit Score, it is easy to see that most of the lower credit scores are in the lower income range and usually have a higher DTI. 
+
+
+### CreditGrade, BorrowerRate and Term
+
+```{r CG, BR, Term, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(loans, aes(Term, BorrowerRate)) +
+  geom_boxplot(aes(group = Term)) +
+  facet_wrap(~CreditGrade) 
+ggplot(loans, aes(CreditGrade,BorrowerRate, color = Term)) +
+  geom_boxplot() +
+  coord_flip()
+```
+
+I wanted to see the relationship between CreditGrade, BorrowerRate and Term to see if there was a major effect and the different variables and I mistakenly discovered that Prosper Bank has not provided credit grades to terms other than 36 months. Not the information I was expecting but certainly useful in getting a full picture of the data. 
+
+
+```{r Rate, CS and Term, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(loans, aes(CreditScoreRangeUpper,BorrowerRate, color = Term)) +
+  geom_point(alpha = 0.5,
+             position = position_jitter(h = 0)) +
+  coord_flip()
+```
+
+This graph shows a better relationship between the 3 variables that I was not able to see on the last graph by changing the CreditGrade variable to CreditScoreRangeUpper and plotting a scatterplot graph rathen than a box plot. You can see that the 12 month terms typically have higher credit scores and lower DTI ratios then longer terms. 36 month terms are far more common than others. 12 and 60 month terms seem to be reserved for those with credit scores of 600 or higher. 
+
+
+### Scatterplot Matrix
+
+```{r Scatterplot Matix, echo=FALSE, message=FALSE, warning=FALSE}
+set.seed(1)
+
+loans$listYear <- format(as.Date(loans$listDate, format="%Y-%m-%d"),"%Y")
+
+ggpairs(loans[sample.int(nrow(loans), 25000),],
+        columns = c(4, 8, 13:14, 16:17),
+        ggplot2::aes(colour = listYear, alpha = 0.1))
+```
+
+Running a scatterplot matrix, I was able to graph a large amount of information into several table to compare. For this, I used a sample size of 25,000 that showed correlation coefficients for 6 of the quantitative variable and shows the year based on color. 
+
+Variables used:
+- BorrowerRate
+- CreditScoreRangeUpper
+- DebtToIncomeRatio
+- StateMonthlyIncome
+- MonthlyLoanPayment
+- LoanOriginalAmount
+
 
 # Multivariate Analysis
 
-### Talk about some of the relationships you observed in this part of the \
-investigation. Were there features that strengthened each other in terms of \
-looking at your feature(s) of interest?
 
-### Were there any interesting or surprising interactions between features?
-
-### OPTIONAL: Did you create any models with your dataset? Discuss the \
-strengths and limitations of your model.
+> It was interesting to see the relationship between DTI, Credit Score and Monthly income. I had to restrict a lof of the outliers to see the data that I was interested in. By adding a color range to the credit score I could point out the high and low points in the graph and their location showed the DTI and Monthly income for that borrower. 
+<br>
+<br>
+The graph with CreditGrade, BorrowerRate and Term surprised me as it showed that Prosper Bank had not given Credit Grades to loans other than 36 months. This prompted the next graph where I replaced CreditGrade with CreditScoreRangeUpper. This provided more information as to what I was looking for. 
+<br>
+<br>
+The Scatterplot Matix was able to provide a lot of information on the variables analyzed and seeing how the different years were effect by each. 
 
 ------
 
 # Final Plots and Summary
 
-> **Tip**: You've done a lot of exploration and have built up an understanding
-of the structure of and relationships between the variables in your dataset.
-Here, you will select three plots from all of your previous exploration to
-present here as a summary of some of your most interesting findings. Make sure
-that you have refined your selected plots for good titling, axis labels (with
-                                                                         units), and good aesthetic choices (e.g. color, transparency). After each plot,
-make sure you justify why you chose each plot by describing what it shows.
 
-### Plot One
-```{r echo=FALSE, Plot_One}
+## Plot One
 
+```{r Plot1, echo=FALSE, message=FALSE, warning=FALSE}
+loans$LoanStatus <- fct_collapse(loans$LoanStatus, 
+                                 ChargedOff = "Chargedoff", 
+                                 Completed = "Completed", 
+                                 Current = c("Current", "FinalPaymentInProgress"), 
+                                 Defaulted = "Defaulted", 
+                                 Cancelled = "Cancelled",
+                                 PastDue = c("Past Due (1-15 days)", 
+                                             "Past Due (16-30 days)", 
+                                             "Past Due (31-60 days)", 
+                                             "Past Due (61-90 days)", 
+                                             "Past Due (91-120 days)", 
+                                             "Past Due (>120 days)"))
+
+cols <- c(ChargedOff = "black", Completed = "blue", Current = "green", Defaulted = "red", PastDue = "orange", Cancelled = "black")
+
+ggplot(aes(x = listDate, y = CreditScoreRangeLower), data = loans) +
+  geom_jitter(aes(colour = LoanStatus), alpha = 0.5) +
+  geom_smooth() +
+  scale_colour_manual(values = cols) +
+  theme_dark() +
+  ggtitle("Breakdown of Credit Score over the years and the loan status") +
+  labs(x = "Date of Loan", y = "Credit Score", color = "Loan Status")
+
+summary(loans$CreditScoreRangeUpper)
+summary(loans$CreditScoreRangeLower)
 ```
 
 ### Description One
 
+> This graph shows the history of the loans given, the borrower's credit score at the date of the loan and the current status. The loans are grouped into 3 time periods, before 2009 Prosper Bank allowed borrower's with credit scores as low as 530. After 2009 the bank seems to have increased their minimum score to an mean credit score of 600. Around mid 2013, the minimum mean credit score was again increased to about 640. 
+<br>
+The housing market crash of 2008 seemed to have effected a lot of borrowers as most of the Charged Off loans fall before 2009 and had a credit score of below 600. The policy change to have a minimum mean score of 600 decreased the chances of the defaulting. 
+<br>
+The green points are most populated on the right of the graph. This makes sense as most of the loans are completed in about 3 years. After that timeframe, they are completed, charged off or defaulted. 
 
-### Plot Two
-```{r echo=FALSE, Plot_Two}
 
+## Plot Two
+
+```{r Plot2, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(loans, aes(DebtToIncomeRatio,BorrowerRate, color = CreditScoreRangeUpper)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth() +
+  scale_y_continuous(limits = c(0.04,0.36), breaks = seq(0.04,0.36,0.02)) +
+  scale_x_continuous(limits = c(0,1.5), breaks = seq(0,1.5,0.25)) +
+  ggtitle("How APR is effected by Credit Score and DTI") +
+  labs(x = "Debt to Income Ratio", y = "Annual Percentage Rate", color = "Credit Score")
 ```
 
 ### Description Two
 
+> You can see a great effect how credit score impacts interest rates as the plot shows lighter points (Higher Score) at the bottom and darker points (Lower Score) towards the top of the graph. There seems to be a few groupings along the 32% rate and the 35% rate. I can assume this is due to the different market changes and what the highest interest rate is during that period. Most of the groupings here seem to be darker as so would getting the worst rates. The DTI Ratio seems to have just a slight effect on Rate when where it will start to increase around 25% DTI but will level out around 75%.
 
-### Plot Three
-```{r echo=FALSE, Plot_Three}
 
+## Plot Three
+
+```{r Plot3, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x = IncomeRange, y = LoanOriginalAmount, color = Term), data = loans) +
+  geom_boxplot(fill = "grey") +
+  scale_y_continuous(breaks = seq(0,35000,5000)) +
+  ggtitle("Impact of Income on Loan Amount and Term") +
+  labs(x = "Income Range", y = "Original Loan Amount", color = "Loan Term") +
+  theme_dark()
 ```
 
 ### Description Three
 
+> There is an obvious relation between income range and the amount lent to the borrower. There is a loan amount limit of $25,000 for those whose income is less that $100,000 and then increases to $35,000 for high income earners. About 90% of all 12 month terms are less than $10,000. It is plain to see that the loan term increases when the loan amount increase. This makes sense as it would take longer to pay back a larger loan with the same monthly payment. 
+
 ------
   
-  # Reflection
+# Reflection
   
-  > **Tip**: Here's the final step! Reflect on the exploration you performed and
-the insights you found. What were some of the struggles that you went through?
-What went well? What was surprising? Make sure you include an insight into
-future work that could be done with the dataset.
+In our analysis of Prosper Loans, we started out with 81 variables and filtered most to bring the amount down to 17 to analyze. We ended up adding 4 more to help with some of the data we were exploring. It is difficult to work with missing data so we cleaned up the data by removing NAs. The brought the number of loans from 113,937 to 97,765. I cleaned up the data a little more by factoring the IncomeRange and the CreditGroup and ordering the variables to assist with plotting the graphs. 
 
-> **Tip**: Don't forget to remove this, and the other **Tip** sections before
-saving your final work and knitting the final report!
+It was very difficult for me to split the data value of the Date time group under ListingDate into two separate variables. But using the strsplit() function, I was able to extract the data as needed for my analysis and then convert the data to a Date with as.Date(). And then to create another variable with just the Year to help with my scatterplot matrix. 
+
+This was a very large dataset with a lot of data to work with. One of the limitation that I noticed and would have liked to explore is the credit score at the time of loan opening vs credit score when it closed, to see how the average score changes over time and if there is a increase, decrease or no movement. I would also like to investigate further to predict success of future loans based off of the data of past and current loans. Overall, it was a great dataset to work with and I learned a lot about R and the different packages available for use. 
